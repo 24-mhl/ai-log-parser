@@ -38,6 +38,9 @@ SYSTEM_PROMPT = (
     "结论要给出依据：引用具体的行号或日志片段。"
 )
 
+# 占位符故意用 <<LOG>> 而不是 {}：
+# 日志里只要出现一对大括号（比如 POST 的 JSON 请求体被记进日志），
+# 用 .format() 拼就会抛 KeyError，把正常日志当成格式错误。
 USER_TEMPLATE = """下面是一份 Web 访问日志（Apache/Nginx 的 access 格式）。请按四个问题做初筛：
 
 1. 谁在打：列出可疑来源 IP，按危险程度排序，并说明判断依据。
@@ -49,7 +52,7 @@ USER_TEMPLATE = """下面是一份 Web 访问日志（Apache/Nginx 的 access �
 
 日志如下：
 ---
-{log}
+<<LOG>>
 ---"""
 
 
@@ -163,7 +166,7 @@ def main() -> int:
           % (args.log, total, len(log_text),
              "（已截断，实际送入 %d 行）" % kept if truncated else ""))
 
-    prompt = USER_TEMPLATE.format(log=log_text)
+    prompt = USER_TEMPLATE.replace("<<LOG>>", log_text)
 
     if args.dry_run:
         print("-" * 60)

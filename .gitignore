@@ -12,6 +12,9 @@ venv/
 out/
 *.log.json
 
+# 手写练习稿（成品是 api.py，这份是照着教程一步步敲的中间态）
+draft.py
+
 # 编辑器
 .vscode/
 .idea/
