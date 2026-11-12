@@ -8,11 +8,14 @@
 
 ```bash
 cp .env.example .env          # 填入 ZHIPU_API_KEY
-python api.py access.log      # 出报告
 python stats.py access.log    # 先看每个 IP 的状态码分布（不花钱）
+python api.py access.log      # 出报告
 ```
 
 `stats.py` 不调模型，纯本地统计：按 IP 汇总状态码，并给每个 IP 打「失败后成功 / 零得手 / 正常业务」标签。**建议先跑它再跑 `api.py`** —— 数字比模型可靠，而且能用来核对模型有没有瞎编。
+
+`practice.py` 是手写练习版，功能上等价于 `api.py` 的早期形态：全平铺、没有函数、没有参数解析。留着是因为三次 prompt 迭代的痕迹都在里面（第 1 问末尾那段「排序依据」是第三版才加的），想理解为什么现在这么写，读它比读 `api.py` 快。
+
 
 | 参数 | 作用 |
 |---|---|
