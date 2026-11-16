@@ -19,3 +19,7 @@ draft*.py
 .vscode/
 .idea/
 .DS_Store
+
+# 模型原始响应
+out.json
+out*.json
