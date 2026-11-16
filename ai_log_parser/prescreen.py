@@ -139,7 +139,8 @@ def select(records, limit=20, per_ip=4):
     for items in by_ip.values():
         items.sort(key=lambda x: (-x[0], x[2].no))
 
-    picked = []
+        picked = []
+    must = set()          # 必选行的身份，最后截断时要护住
     for ip, items in by_ip.items():
         budget = per_ip + 2 if ip in wins else per_ip
         chosen = []
@@ -148,11 +149,13 @@ def select(records, limit=20, per_ip=4):
         for item in items:
             if item[2].status == 302:
                 chosen.append(item)
+                must.add(id(item))
                 break
         # 2. 分数最高的认证失败那一行
         for item in items:
             if item[2].status in (401, 403):
                 chosen.append(item)
+                must.add(id(item))
                 break
         # 3. 补足
         for item in items:
@@ -162,7 +165,8 @@ def select(records, limit=20, per_ip=4):
                 chosen.append(item)
         picked.extend(chosen[:budget])
 
-    picked.sort(key=lambda x: (-x[0], x[2].no))
+    # 必选行排最前，其余按分数 —— 这样截断只会砍掉"补足"的行
+    picked.sort(key=lambda x: (0 if id(x) in must else 1, -x[0], x[2].no))
     return picked[:limit]
 
 
