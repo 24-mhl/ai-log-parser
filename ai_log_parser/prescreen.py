@@ -7,6 +7,7 @@
 1. **同一形态只留一条。**
    某个 IP 对着 /admin/login.php 撞了 22 次，把 22 行都喂给模型没有意义 ——
    模型要的是「形态」，不是「次数」。次数由 summarize() 算准了单独给它。
+   同理，nmap 扫三个不同路径也只留一条：那是同一把扫描器的一次行为。
 
 2. **分数必须有理由。**
    每一条命中的规则都写进 reasons，最后会原样出现在 prompt 里，
@@ -111,8 +112,10 @@ def first_success(records):
 def select(records, limit=20, per_ip=4):
     """按分数挑行，返回 [(分数, 理由, 记录), ...]。
 
-    选择顺序分三步，顺序不能换：
+    选择顺序分四步，顺序不能换：
 
+    0. **去重**：同一 IP + 同一扫描器 UA 的失败形态只留分数最高的一条，
+       省下的名额给真正得手的链路。
     1. **必选**：出现过 302 的 IP，那一行 302 一定要在。
        它是「进去了」的唯一证据，被分数挤掉就等于丢结论。
     2. **必选**：同一 IP 里分数最高的那条 401/403，代表它敲门的手法。
@@ -132,6 +135,27 @@ def select(records, limit=20, per_ip=4):
         current = shapes.get(key)
         if current is None or points > current[0]:
             shapes[key] = (points, reasons, rec)
+
+    # 同一 IP + 同一扫描器 UA 的失败形态只留一条。
+    # nmap 扫 /manager、/phpmyadmin、/.env 会产生三条 9 分记录，
+    # 但它们说的是同一件事：「这个 IP 在扫描」，信息量只有一份。
+    # 次数已经由 summarize() 单独算准，这里只留形态。
+    # 只压扫描器 UA + 失败状态码，不碰正常浏览器的 401→302→200 链路。
+    scan_best = {}      # (ip, ua) -> (形状 key, 那个 item)
+    for key, item in list(shapes.items()):
+        rec = item[2]
+        low_ua = rec.ua.lower()
+        if (any(k in low_ua for k in SCANNER_UA)
+                and rec.status in (401, 403, 404)):
+            scan_key = (rec.ip, rec.ua)
+            prev = scan_best.get(scan_key)
+            if prev is None:
+                scan_best[scan_key] = (key, item)
+            elif prev[1][0] >= item[0]:
+                shapes.pop(key, None)        # 旧的分数更高或相同，丢新的
+            else:
+                shapes.pop(prev[0], None)    # 新的更高，丢旧的
+                scan_best[scan_key] = (key, item)
 
     by_ip = {}
     for (ip, _m, _p, _s), item in shapes.items():

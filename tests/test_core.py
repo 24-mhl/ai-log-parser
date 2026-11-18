@@ -82,6 +82,33 @@ class TestPrescreen(unittest.TestCase):
         statuses = [rec.status for _p, _r, rec in picked]
         self.assertIn(302, statuses)
 
+    def test_repeated_scanner_paths_deduped(self):
+        # 同一个 nmap 扫三个不同路径，只该占一条候选名额
+        paths = ("/manager/html", "/phpmyadmin/", "/.env")
+        lines = [
+            ('203.0.113.77 - - [07/Nov/2026:02:43:1%d +0800] '
+             '"GET %s HTTP/1.1" 403 162 "-" '
+             '"Mozilla/5.0 (compatible; Nmap Scripting Engine)"') % (i, path)
+            for i, path in enumerate(paths)
+        ]
+        records = [parse_line(line, no) for no, line in enumerate(lines, 1)]
+        picked = prescreen.select(records, limit=10, per_ip=4)
+        self.assertEqual(len(picked), 1)
+        self.assertEqual(picked[0][2].no, 1)
+        # 统计层不受影响，三次 403 仍然要如实报出来
+        self.assertEqual(prescreen.summarize(records)[0]["fails"], 3)
+
+    def test_dedup_keeps_real_bruteforce_chain(self):
+        # 同一 IP 同一浏览器 UA 的 401→302→200 不能被去重
+        login = LINE_200.replace("192.0.2.31", "198.18.44.91")
+        records = [parse_line(line, no) for no, line in
+                   enumerate([LINE_401, LINE_302, login], 1)]
+        picked = prescreen.select(records, limit=10, per_ip=4)
+        statuses = [rec.status for _p, _r, rec in picked]
+        self.assertIn(401, statuses)
+        self.assertIn(302, statuses)
+        self.assertIn(200, statuses)
+
 
 class TestSanitize(unittest.TestCase):
     def setUp(self):
